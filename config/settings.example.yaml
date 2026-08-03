@@ -1,0 +1,21 @@
+# SINU Auto-Enrollment settings
+# Copy to settings.yaml and adjust for your case.
+
+sinu:
+  url: "https://sinu.usc.edu.co:8443/sinugwt/"
+  period: "2026B"          # enrollment period (informational)
+  program: "P217"          # program code (informational)
+
+target:
+  course_code: "ISI51"            # course to watch (e.g. PROYECTO INTEGRADOR DE GRADO)
+  group_prefix: "PIG"             # group name prefix (PIG01, PIG02, ...)
+  require_no_conflict: true       # only groups without schedule conflict
+  fixed_schedule:                 # courses you already have (conflict sources)
+    - name: "ECUACIONES DIFERENCIALES"
+      days: ["Martes"]
+      time: "18:30-21:30"
+
+enroll:
+  auto: true                      # enroll automatically when a matching group appears
+  max_attempts: 3
+  wait_between_checks: 1800       # seconds between checks in watch mode
