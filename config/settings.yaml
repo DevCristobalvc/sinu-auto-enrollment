@@ -1,0 +1,19 @@
+# SINU Auto-Enrollment settings (active)
+sinu:
+  url: "https://sinu.usc.edu.co:8443/sinugwt/"
+  period: "2026B"
+  program: "P217"
+
+target:
+  course_code: "ISI51"
+  group_prefix: "PIG"
+  require_no_conflict: true
+  fixed_schedule:
+    - name: "ECUACIONES DIFERENCIALES"
+      days: ["Martes"]
+      time: "18:30-21:30"
+
+enroll:
+  auto: true
+  max_attempts: 3
+  wait_between_checks: 1800

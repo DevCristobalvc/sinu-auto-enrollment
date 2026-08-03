@@ -6,7 +6,10 @@ from typing import Optional
 
 from playwright.sync_api import Page
 
+from .logging_setup import get_logger
 from .parser import Group
+
+log = get_logger()
 
 
 class Enroller:
@@ -28,9 +31,11 @@ class Enroller:
         """
         row = self.page.locator(f"tr:has-text('{group.grupo}')").first
         if row.count() == 0:
+            log.warning("Group row %s not found", group.grupo)
             return False
         sel_icon = row.locator("img[src*='select']").first
         if sel_icon.count() == 0:
+            log.warning("Select icon not found for %s", group.grupo)
             return False
         sel_icon.scroll_into_view_if_needed()
         # Full mouse event sequence — SmartClient listens to mousedown/up
@@ -38,6 +43,7 @@ class Enroller:
         if box is None:
             return False
         x, y = box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
+        log.info("Selecting group %s at (%s, %s)", group.grupo, int(x), int(y))
         self.page.mouse.move(x, y)
         time.sleep(0.4)
         self.page.mouse.down()
@@ -53,6 +59,7 @@ class Enroller:
         WARNING: closing enrollment is IRREVERSIBLE — only call when sure.
         """
         x, y = self.BTN_CERRAR_MATRICULA
+        log.info("Clicking 'Cerrar matrícula' at (%s, %s)", x, y)
         self.page.mouse.click(x, y)
         time.sleep(5)
 
@@ -60,9 +67,11 @@ class Enroller:
         body = self.page.evaluate("() => document.body ? document.body.innerText : ''")
         if "cerrar su matr" in body.lower() or "seguro" in body.lower():
             ok_x, ok_y = self.DIALOG_OK
+            log.info("Confirmation dialog found — clicking OK at (%s, %s)", ok_x, ok_y)
             self.page.mouse.click(ok_x, ok_y)
             time.sleep(6)
             return True
+        log.warning("Confirmation dialog not found after clicking Cerrar matrícula")
         return False
 
     def is_selected(self, group: Group) -> Optional[bool]:

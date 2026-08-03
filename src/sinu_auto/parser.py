@@ -74,14 +74,20 @@ class GroupParser:
             fecha = row[10].get("txt", "") if len(row) > 10 else ""
 
             sin_cruce = "false_cruce" in cruce_img
+            # cupo: a digit = available slots; an icon like true_cruce.png = FULL
             cupo_es_numero = cupo_raw.isdigit()
-            cupo_valor = int(cupo_raw) if cupo_es_numero else (cupo_raw if cupo_raw else "?")
+            if cupo_es_numero:
+                cupo_valor = int(cupo_raw)
+                cupo_disp = cupo_valor > 0
+            else:
+                cupo_valor = 0
+                cupo_disp = False  # icon (e.g. true_cruce.png) = full / no capacity
 
             groups.append(
                 Group(
                     grupo=grupo,
                     sin_cruce=sin_cruce,
-                    cupo_disp=cupo_es_numero and int(cupo_raw) > 0,
+                    cupo_disp=cupo_disp,
                     cupo_valor=cupo_valor,
                     horario=horario,
                     fecha=fecha,
