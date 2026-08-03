@@ -1,43 +1,63 @@
-# SINU Auto-Enrollment
+# SINU Auto-Enrollment 🎓
 
 Automated enrollment monitor for **SINU USC** (Universidad Santiago de Cali academic system).
 
-Detects when a course group becomes available (no schedule conflict + open slot) and enrolls automatically — no LLM calls, pure Playwright automation.
+Detects when a course group becomes available (no schedule conflict + open slot) and enrolls automatically — **pure Playwright automation, zero LLM calls**.
 
-## Why
+![GitHub](https://img.shields.io/badge/language-Python-blue) ![License](https://img.shields.io/badge/license-MIT-green)
 
-Manually refreshing SINU every few minutes to catch a freed slot in a full course (e.g. *Proyecto Integrador de Grado*) is tedious. This tool does it for you:
+---
 
-- Logs into SINU with your credentials
-- Navigates to *Matrícula individual*
-- Reads the group table (schedule conflict + capacity state per group)
-- **Optionally enrolls** in the first group matching your criteria
-- Prints a machine-readable JSON result (for cron/CI or an agent to interpret)
+## 🧠 Why
 
-## Features
+Manually refreshing SINU every few minutes to catch a freed slot in a full course (e.g. *Proyecto Integrador de Grado*) is tedious. This tool does it for you — silently, deterministically, and for **$0.00 in tokens** (see [Cost Analysis](docs/cost-analysis.md)).
 
-- 🔐 **Credentials via environment variables or `.env`** — never hardcoded
-- ⚙️ **Fully configurable**: course code, program code, period, conflict rules
-- 🚫 **No LLM dependency** — deterministic Playwright automation only
-- 🧩 **Two modes**: `check` (read-only) and `enroll` (auto-enroll)
-- 📦 **JSON output** — easy to parse from cron, CI, or a chatbot agent
-- 🎯 **Conflict awareness** — ignores groups that clash with your fixed schedule
+## ⚡ Features
 
-## Requirements
+- 🔐 **Credentials via `.env`** — never hardcoded
+- ⚙️ **Fully configurable** — course code, group prefix, conflict rules
+- 🚫 **No LLM dependency** — deterministic automation only
+- 🧩 **Two modes**: `check` (read-only) + `enroll` (auto-enroll) + `watch` (loop)
+- 📦 **JSON output** — machine-readable for cron/CI/agents
+- 🎯 **Conflict-aware** — ignores groups that clash with your fixed schedule
+- 📝 **Structured logging** — stderr + optional file, never mixes with JSON output
+
+## 🏗️ How it works
+
+```mermaid
+flowchart TD
+    A[CLI: check / enroll / watch] --> B[Load config + credentials]
+    B --> C[Connect browser via CDP]
+    C --> D[Login to SINU]
+    D --> E[Open Matrícula individual]
+    E --> F[Select program row]
+    F --> G[Expand target course]
+    G --> H[Parse group table]
+    H --> I{Any group rows?}
+    I -- No --> J[estado: sin_grupos]
+    I -- Yes --> K[Apply filters]
+    K --> L{no_conflict AND cupo?}
+    L -- No --> M[estado: sin_cupo]
+    L -- Yes --> N{enroll mode?}
+    N -- No --> O[estado: con_cupo]
+    N -- Yes --> P[Select group + close enrollment]
+    P --> Q[estado: matriculado]
+    J & M & O & Q --> R[JSON to stdout]
+    R --> S[Logs to stderr/file]
+```
+
+## 📦 Requirements
 
 - Python 3.10+
-- A Chrome/Chromium browser (Playwright uses the system browser via CDP)
+- Chrome/Chromium (Playwright connects via CDP)
 
 ```bash
 pip install -r requirements.txt
-playwright install chromium  # only if you don't have a system Chrome
 ```
 
-## Quick start
+## 🚀 Quick start
 
 ### 1. Configure credentials
-
-Copy the example config and fill in your SINU credentials:
 
 ```bash
 cp config/example.env .env
@@ -53,27 +73,37 @@ SINU_URL=https://sinu.usc.edu.co:8443/sinugwt/
 ### 2. Check availability (read-only)
 
 ```bash
-python -m sinu_auto check --config config/settings.yaml
+python -m sinu_auto check --config config/settings.yaml --env .env
 ```
-
-Example output:
 
 ```json
 {
-  "estado": "con_cupo",
+  "estado": "sin_cupo",
+  "timestamp": "2026-08-03T23:23:33",
   "grupos": [
-    {"grupo": "PIG03", "sin_cruce": true, "cupo": 1, "horario": "Jueves 18:30 - 21:30"}
-  ]
+    {"grupo": "PIG03", "sin_cruce": true,  "cupo_disp": false, "cupo_valor": 0, "horario": "Jueves 18:30 - 21:30"},
+    {"grupo": "PIG02", "sin_cruce": false, "cupo_disp": true,  "cupo_valor": 17, "horario": "Martes 18:30 - 21:30"}
+  ],
+  "candidatos": [],
+  "matriculado": null
 }
 ```
 
 ### 3. Auto-enroll
 
 ```bash
-python -m sinu_auto enroll --config config/settings.yaml
+python -m sinu_auto enroll --config config/settings.yaml --env .env
 ```
 
-## Configuration
+### 4. Watch (loop mode)
+
+```bash
+python -m sinu_auto watch --config config/settings.yaml --env .env --interval 1800
+```
+
+> 💡 **Production pattern:** run `enroll` from a cron job every 30 min. The wrapper script only emits output when there's something to report (see `scripts/sinu_monitor.sh`).
+
+## 📐 Configuration
 
 All behavior lives in `config/settings.yaml`:
 
@@ -95,10 +125,10 @@ target:
 enroll:
   auto: true                  # enroll when a matching group is found
   max_attempts: 3
-  wait_between_checks: 1800   # seconds (only used by the loop mode)
+  wait_between_checks: 1800   # seconds (watch mode)
 ```
 
-## CLI reference
+## 🖥️ CLI reference
 
 ```
 usage: python -m sinu_auto {check,enroll,watch} [options]
@@ -112,17 +142,19 @@ watch   Loop mode: check every N seconds until a slot opens.
 |---|---|
 | `--config PATH` | Path to settings YAML (default `config/settings.yaml`) |
 | `--env PATH` | Path to `.env` file (default `.env`) |
-| `--dry-run` | Print what would happen without doing it |
-| `--interval SEC` | Watch interval in seconds (default from config) |
+| `--verbose` | DEBUG logging to stderr |
+| `--log-file PATH` | Also write logs to a file |
+| `--dry-run` | Print what would happen without doing it (enroll only) |
+| `--interval SEC` | Watch interval in seconds (watch only) |
 
-## JSON output schema
+## 📊 JSON output schema
 
-Every run prints one JSON object to stdout:
+Every run prints **one JSON object to stdout**:
 
 ```json
 {
-  "estado": "con_cupo | sin_cupo | error | matriculado",
-  "timestamp": "2026-08-03T22:13:29",
+  "estado": "con_cupo | sin_cupo | sin_grupos | matriculado | error | error_matricula",
+  "timestamp": "2026-08-03T23:23:33",
   "grupos": [
     {
       "grupo": "PIG03",
@@ -132,50 +164,74 @@ Every run prints one JSON object to stdout:
       "horario": "Jueves 18:30 - 21:30"
     }
   ],
+  "candidatos": ["PIG03"],
   "matriculado": null
 }
 ```
 
-- `estado=matriculado` → enrollment succeeded (only in `enroll` mode)
+- `estado=matriculado` → enrollment succeeded (enroll mode)
 - `estado=error` → something failed (see `error` field)
+- Logs never mix into stdout — parse with `json.loads(stdout)` safely
 
-## Architecture
+## 🔬 Decision logic
+
+```mermaid
+flowchart LR
+    A[Group row] --> B{sin_cruce?}
+    B -- false --> C[SKIP: conflict]
+    B -- true --> D{cupo_disp?}
+    D -- false --> E[SKIP: full]
+    D -- true --> F[CANDIDATE ✅]
+    F --> G[enroll first candidate]
+```
+
+## 🗂️ Architecture
 
 ```
 sinu-auto-enrollment/
 ├── src/sinu_auto/
 │   ├── __init__.py
-│   ├── cli.py          # CLI entry point
-│   ├── browser.py      # Playwright/CDP session management
-│   ├── login.py        # SINU authentication
-│   ├── navigator.py    # UI navigation (SmartClient clicks)
-│   ├── parser.py       # Group table parsing (DOM → structured data)
-│   ├── enroller.py     # Enrollment logic
-│   └── config.py       # Settings + env loading
+│   ├── __main__.py      # python -m entry
+│   ├── cli.py           # CLI: check / enroll / watch
+│   ├── browser.py       # Playwright/CDP session management
+│   ├── config.py        # YAML + .env → typed settings
+│   ├── logging_setup.py # stderr + file logging
+│   ├── login.py         # SINU authentication
+│   ├── navigator.py     # UI navigation (SmartClient clicks)
+│   ├── parser.py        # Group table → structured data
+│   └── enroller.py      # Enrollment logic
 ├── config/
-│   ├── example.env     # Credential template
-│   └── settings.yaml   # Behavior configuration
+│   ├── example.env      # Credential template
+│   └── settings.yaml    # Behavior configuration
 ├── scripts/
-│   └── sinu_monitor.sh # Cron wrapper
+│   └── sinu_monitor.sh  # Cron wrapper (watchdog pattern)
 ├── docs/
-│   └── sinu-ui-map.md  # SmartClient UI coordinates reference
-└── tests/
+│   ├── sinu-ui-map.md   # SmartClient UI coordinates reference
+│   └── cost-analysis.md # Cost & resource analysis
+├── tests/
+└── README.md
 ```
 
-## SmartClient notes
+## ⚠️ SmartClient notes
 
-SINU is a SmartClient (Isomorphic) app — the DOM is canvas/grid based and buttons are rendered as images. The automation relies on:
+SINU is a SmartClient (Isomorphic) app — the DOM is grid-based and buttons are rendered as images. The automation relies on:
 
-1. **CSS/locator selectors** for text-bearing elements (`tr:has-text(...)`)
+1. **CSS/locator selectors** for text elements (`tr:has-text(...)`)
 2. **Image-based detection** for state icons:
    - `false_cruce.png` → no schedule conflict
    - `true_cruce.png` → schedule conflict / full
    - `true_select.png` → group selectable
    - `row_collapsed.gif` → expandable row
-3. **Coordinate clicks** only where no selector exists (SmartClient buttons)
+3. **Coordinate clicks** only where no selector exists
 
 If the UI changes, update `docs/sinu-ui-map.md` and the selectors in `navigator.py`.
 
-## License
+## 🧪 Tests
 
-MIT
+```bash
+python -m pytest tests/ -q
+```
+
+## 📄 License
+
+MIT © 2026 Cristobal Valencia Ceron

@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sinu-auto-enrollment"
+version = "0.1.0"
+description = "Automated enrollment monitor for SINU USC — check/enroll/watch CLI, deterministic Playwright automation, no LLM dependency."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+dependencies = [
+    "playwright>=1.40.0",
+    "PyYAML>=6.0",
+]
+
+[project.scripts]
+sinu-auto = "sinu_auto.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
