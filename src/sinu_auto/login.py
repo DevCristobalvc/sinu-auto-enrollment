@@ -42,14 +42,21 @@ def login(page: Page, url: str, username: str, password: str) -> None:
 
     # Verify login succeeded: the student menu should be present
     body = page.evaluate("() => document.body ? document.body.innerText : ''")
-    if "Salir" not in body and "CERON" not in body and "Estudiante" not in body:
+    if "Salir" not in body and "Estudiante" not in body:
         raise LoginError("Login may have failed — expected menu text not found")
     log.info("Login verified: student menu present")
 
 
 def set_input(page: Page, selector: str, value: str) -> None:
-    """Set an input value with native setter + input event (SmartClient-friendly)."""
+    """Set an input value with native setter + input event (SmartClient-friendly).
+
+    The value is embedded as a JSON string literal so special characters
+    (quotes, backslashes, newlines) cannot break out of the JS expression.
+    """
+    import json
+
+    payload = json.dumps(value)
     page.eval_on_selector(
         selector,
-        f"el => {{ el.value='{value}'; el.dispatchEvent(new Event('input', {{bubbles:true}})); }}",
+        f"el => {{ el.value={payload}; el.dispatchEvent(new Event('input', {{bubbles:true}})); }}",
     )

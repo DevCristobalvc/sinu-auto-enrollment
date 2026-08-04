@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import List
 
 import yaml
 
@@ -23,7 +24,7 @@ class SinusSettings:
     require_no_conflict: bool = True
 
     # Fixed schedule (conflict sources): list of {name, days[], time}
-    fixed_schedule: list = field(default_factory=list)
+    fixed_schedule: List[dict] = field(default_factory=list)
 
     # Enrollment behavior
     auto_enroll: bool = True
@@ -56,11 +57,11 @@ def load_settings(config_path: str = "config/settings.yaml", env_path: str = ".e
     env = _load_env(env_path)
     s = SinusSettings()
 
-    # SINU section
+    # SINU section — real environment wins over .env file (12-factor style)
     sinu_cfg = raw.get("sinu", {})
-    s.url = env.get("SINU_URL") or os.getenv("SINU_URL") or sinu_cfg.get("url", s.url)
-    s.username = env.get("SINU_USERNAME") or os.getenv("SINU_USERNAME") or ""
-    s.password = env.get("SINU_PASSWORD") or os.getenv("SINU_PASSWORD") or ""
+    s.url = os.getenv("SINU_URL") or env.get("SINU_URL") or sinu_cfg.get("url", s.url)
+    s.username = os.getenv("SINU_USERNAME") or env.get("SINU_USERNAME") or ""
+    s.password = os.getenv("SINU_PASSWORD") or env.get("SINU_PASSWORD") or ""
 
     # Target section
     target = raw.get("target", {})
@@ -81,4 +82,13 @@ def load_settings(config_path: str = "config/settings.yaml", env_path: str = ".e
             "in your .env file (see config/example.env)."
         )
 
+    _validate_settings(s)
     return s
+
+
+def _validate_settings(s: SinusSettings) -> None:
+    """Validate numeric settings, raising ValueError with a clear message."""
+    if s.max_attempts < 1:
+        raise ValueError(f"enroll.max_attempts must be >= 1, got {s.max_attempts}")
+    if s.watch_interval < 0:
+        raise ValueError(f"enroll.wait_between_checks must be >= 0, got {s.watch_interval}")

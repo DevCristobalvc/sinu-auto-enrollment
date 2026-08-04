@@ -16,11 +16,22 @@ class Group:
     grupo: str
     sin_cruce: bool
     cupo_disp: bool
-    cupo_valor: object
+    cupo_valor: int
     horario: str
     fecha: str
     raw_cruce: str = ""
     raw_cupo: str = ""
+
+    def to_dict(self) -> dict:
+        """Serialize to a plain dict (for JSON output)."""
+        return {
+            "grupo": self.grupo,
+            "sin_cruce": self.sin_cruce,
+            "cupo_disp": self.cupo_disp,
+            "cupo_valor": self.cupo_valor,
+            "horario": self.horario,
+            "fecha": self.fecha,
+        }
 
 
 class GroupParser:
@@ -55,6 +66,7 @@ class GroupParser:
         )
 
         groups: List[Group] = []
+        pattern = re.compile(rf"{re.escape(group_prefix)}\d+")
         for row in rows:
             if len(row) < 4:
                 continue
@@ -65,10 +77,14 @@ class GroupParser:
             # Group code: search all cells for the prefix pattern (e.g. PIG03)
             grupo = ""
             for cell in row:
-                m = re.search(r"({prefix}\d+)".format(prefix=re.escape(group_prefix)), cell.get("txt", ""))
+                m = pattern.search(cell.get("txt", ""))
                 if m:
-                    grupo = m.group(1)
+                    grupo = m.group(0)
                     break
+
+            # Skip rows that matched the prefix but carry no actual group code
+            if not grupo:
+                continue
 
             horario = row[9].get("txt", "") if len(row) > 9 else ""
             fecha = row[10].get("txt", "") if len(row) > 10 else ""
@@ -102,16 +118,6 @@ class GroupParser:
     def to_json(groups: List[Group]) -> str:
         """Serialize groups to JSON (for CLI output)."""
         return json.dumps(
-            [
-                {
-                    "grupo": g.grupo,
-                    "sin_cruce": g.sin_cruce,
-                    "cupo_disp": g.cupo_disp,
-                    "cupo_valor": g.cupo_valor,
-                    "horario": g.horario,
-                    "fecha": g.fecha,
-                }
-                for g in groups
-            ],
+            [g.to_dict() for g in groups],
             ensure_ascii=False,
         )
