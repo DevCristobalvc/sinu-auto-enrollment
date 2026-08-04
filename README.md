@@ -144,8 +144,14 @@ watch   Loop mode: check every N seconds until a slot opens.
 | `--env PATH` | Path to `.env` file (default `.env`) |
 | `--verbose` | DEBUG logging to stderr |
 | `--log-file PATH` | Also write logs to a file |
-| `--dry-run` | Print what would happen without doing it (enroll only) |
+| `--dry-run` | Print what would happen without doing it (enroll and watch) |
 | `--interval SEC` | Watch interval in seconds (watch only) |
+| `--version` | Print version and exit |
+
+> 💡 **Retry behavior:** in `enroll` mode, the tool retries up to
+> `enroll.max_attempts` times (default 3) before giving up. Between attempts it
+> re-reads the group table, so if the first attempt fails because a slot was
+> taken, it picks the next available group automatically.
 
 ## 📊 JSON output schema
 

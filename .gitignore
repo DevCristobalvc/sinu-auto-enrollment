@@ -4,6 +4,12 @@ __pycache__/
 *.egg-info/
 .venv/
 venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+dist/
+build/
+*.egg
 
 # Credentials
 .env
@@ -15,3 +21,6 @@ venv/
 
 # Playwright
 node_modules/
+
+# Logs
+*.log
